@@ -4,6 +4,8 @@ Conversor CNY ↔ BRL usando cotações oficiais de fechamento do Banco Central 
 
 React · TypeScript · Cloudflare Workers · PWA
 
+**Live:** https://yuan-real.vitordevbath.workers.dev
+
 ![Yuan Real convertendo 1000 CNY para BRL](docs/screenshot.png)
 
 ## Funcionalidades
