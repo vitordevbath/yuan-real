@@ -14,11 +14,6 @@ function readSavedRates(): RatesPayload | null {
   }
 }
 
-function timestampLabel(timestamp: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(timestamp)
-  return match ? `${match[3]}/${match[2]}/${match[1]} às ${match[4]}:${match[5]}` : timestamp
-}
-
 function RateChart({ history }: { history: RatesPayload['history'] }) {
   const points = history.slice(-30)
   if (points.length < 2) {
@@ -176,15 +171,15 @@ export default function App() {
             <span className="field-label">{target === 'BRL' ? 'Real Brasileiro' : 'Yuan Chinês'}</span>
             <div className="input-row result-row">
               <span className="currency-symbol">{target === 'CNY' ? '¥' : 'R$'}</span>
-              <output className="result-number">{convertedAmount === null ? '—' : formatCurrency(convertedAmount, target)}</output>
+              <output className="result-number">{convertedAmount === null ? '—' : convertedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</output>
               <span className="currency-code">{target}</span>
             </div>
           </div>
 
           <div className="rate-summary">
-            {rates ? <><strong>1 CNY = {formatCurrency(rates.latest.sell, 'BRL')}</strong><span>PTAX de venda</span></> : <strong>{loading ? 'Buscando cotação…' : 'Cotação indisponível'}</strong>}
+            {rates ? <><strong>1 CNY = {formatCurrency(rates.latest.sell, 'BRL', 4)}</strong><span>PTAX de venda</span></> : <strong>{loading ? 'Buscando cotação…' : 'Cotação indisponível'}</strong>}
           </div>
-          {rates && <p className="rate-time">Atualizada em {timestampLabel(rates.latest.timestamp)}</p>}
+          {rates && <p className="rate-time">Fechamento de {rates.latest.date}</p>}
           {(stale || error || !online) && (
             <div className="notice" role="status">
               <span className="notice-dot" />
@@ -219,8 +214,8 @@ export default function App() {
               Detalhes da cotação <span>{detailsOpen ? '−' : '+'}</span>
             </button>
             {detailsOpen && <div className="details-content">
-              <p><span>PTAX de venda</span><strong>{formatCurrency(rates.latest.sell, 'BRL')}</strong></p>
-              <p><span>PTAX de compra</span><strong>{formatCurrency(rates.latest.buy, 'BRL')}</strong></p>
+              <p><span>PTAX de venda</span><strong>{formatCurrency(rates.latest.sell, 'BRL', 4)}</strong></p>
+              <p><span>PTAX de compra</span><strong>{formatCurrency(rates.latest.buy, 'BRL', 4)}</strong></p>
               <p className="disclaimer">A PTAX é uma referência e não garante o preço de uma operação financeira.</p>
             </div>}
           </section>

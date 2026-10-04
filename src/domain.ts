@@ -19,13 +19,13 @@ export function convert(amount: number, from: Currency, sellRate: number): numbe
   return from === 'CNY' ? amount * sellRate : amount / sellRate
 }
 
-export function formatCurrency(amount: number, currency: Currency): string {
+export function formatCurrency(amount: number, currency: Currency, fractionDigits = 2): string {
   if (!Number.isFinite(amount)) amount = 0
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: currency === 'CNY' ? 'CNY' : 'BRL',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
   }).format(amount).replace('CN¥', '¥')
 }
 

@@ -19,6 +19,11 @@ describe('conversão e valores em pt-BR', () => {
     expect(formatCurrency(1234.56, 'CNY')).toBe('¥ 1.234,56')
   })
 
+  it('formata cotações PTAX com quatro casas decimais', () => {
+    expect(formatCurrency(0.7791, 'BRL', 4)).toMatch(/^R\$\s0,7791$/)
+    expect(formatCurrency(0.779, 'BRL', 4)).toMatch(/^R\$\s0,7790$/)
+  })
+
   it.each([
     ['1', 1], ['10', 10], ['10,50', 10.5], ['1.000,50', 1000.5], ['1.000', 1000], ['1.5', 1.5]
   ])('interpreta %s no padrão esperado', (input, expected) => {
