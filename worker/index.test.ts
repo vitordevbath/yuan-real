@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   buildCsvUrl,
   buildRatesPayload,
+  createMemoryCsvCache,
   findLatestCnyQuote,
+  getRates,
   getSaoPauloDate,
+  isWeekend,
   parseCnyClosingCsv,
   shiftDate
 } from './index'
@@ -134,5 +137,39 @@ describe('data de Brasília e busca da última cotação', () => {
   it('avança e recua datas de calendário sem pressupor dias úteis', () => {
     expect(shiftDate('20261004', -2)).toBe('20261002')
     expect(shiftDate('20261002', 3)).toBe('20261005')
+  })
+})
+
+describe('histórico e limite de subrequests do Worker', () => {
+  const ddmmyyyy = (date: string) => `${date.slice(6, 8)}/${date.slice(4, 6)}/${date.slice(0, 4)}`
+
+  it('identifica sábados e domingos', () => {
+    expect(isWeekend('20261003')).toBe(true)
+    expect(isWeekend('20261004')).toBe(true)
+    expect(isWeekend('20261002')).toBe(false)
+    expect(isWeekend('20261005')).toBe(false)
+  })
+
+  it('monta 30 fechamentos sem baixar CSVs de fim de semana e abaixo de 50 subrequests', async () => {
+    const requested: string[] = []
+    const fetcher = (async (input: URL | RequestInfo) => {
+      const date = /(\d{8})\.csv$/.exec(String(input))?.[1] ?? ''
+      requested.push(date)
+      return isWeekend(date) ? new Response(null, { status: 404 }) : new Response(cnyCsv(ddmmyyyy(date)))
+    }) as typeof fetch
+    const rates = await getRates(new Date('2026-10-04T15:00:00.000Z'), fetcher)
+    expect(rates.latest.date).toBe('02/10/2026')
+    expect(rates.history.length).toBeGreaterThanOrEqual(30)
+    expect(requested.slice(2).some(isWeekend)).toBe(false)
+    expect(requested.length).toBeLessThan(45)
+  })
+
+  it('cache em memória devolve o CSV até expirar', async () => {
+    let now = 1_000
+    const cache = createMemoryCsvCache(() => now)
+    await cache.put('20200101', 200, bytes('x'), 60)
+    expect((await cache.get('20200101'))?.status).toBe(200)
+    now += 61_000
+    expect(await cache.get('20200101')).toBeNull()
   })
 })

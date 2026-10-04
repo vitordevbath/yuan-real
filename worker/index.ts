@@ -156,32 +156,23 @@ function cacheRequest(origin: string, key: string): Request {
   return new Request(new URL(`/__yuan-real-cache/${key}`, origin), { method: 'GET' })
 }
 
-function createEdgeCsvCache(origin: string, cache?: WorkerCache): DailyCsvCache | undefined {
-  if (!cache) return undefined
+// CSVs ficam em memória do isolate: a Cache API conta no limite de subrequests
+// do Worker e, com ~30 arquivos por resposta, estouraria esse limite.
+const memoryCsvCache = new Map<string, { status: number; bytes: ArrayBuffer; expiresAt: number }>()
+
+export function createMemoryCsvCache(now: () => number = Date.now): DailyCsvCache {
   return {
     async get(date) {
-      try {
-        const response = await cache.match(cacheRequest(origin, `csv/${date}`))
-        if (!response) return null
-        const status = Number(response.headers.get('x-source-status'))
-        return { status: Number.isFinite(status) ? status : 200, bytes: await response.arrayBuffer() }
-      } catch {
+      const entry = memoryCsvCache.get(date)
+      if (!entry) return null
+      if (entry.expiresAt <= now()) {
+        memoryCsvCache.delete(date)
         return null
       }
+      return { status: entry.status, bytes: entry.bytes }
     },
     async put(date, status, bytes, ttlSeconds) {
-      const response = new Response(bytes, {
-        headers: {
-          'cache-control': `public, max-age=${ttlSeconds}`,
-          'content-type': 'text/csv; charset=windows-1252',
-          'x-source-status': String(status)
-        }
-      })
-      try {
-        await cache.put(cacheRequest(origin, `csv/${date}`), response)
-      } catch {
-        // Cache is an optimization; PTAX data remains available without it.
-      }
+      memoryCsvCache.set(date, { status, bytes, expiresAt: now() + ttlSeconds * 1000 })
     }
   }
 }
@@ -221,11 +212,19 @@ export async function findLatestCnyQuote(startDate: string, loadCsv: (date: stri
   throw new Error(`Não foi encontrada cotação CNY (código BCB 795) nos últimos ${MAX_LOOKBACK_DAYS} dias.`)
 }
 
+// O BCB não publica fechamento aos sábados e domingos; pular essas datas no
+// histórico mantém a resposta dentro do limite de subrequests do Worker.
+export function isWeekend(date: string): boolean {
+  const day = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(4, 6)) - 1, Number(date.slice(6, 8)))).getUTCDay()
+  return day === 0 || day === 6
+}
+
 async function loadHistory(latest: Quote, loadCsv: (date: string) => Promise<{ status: number; bytes: ArrayBuffer }>): Promise<Quote[]> {
   const latestCompact = latest.timestamp.slice(0, 10).replaceAll('-', '')
   const quotes = new Map<string, Quote>([[latest.date, latest]])
   for (let offset = 1; offset < HISTORY_CALENDAR_DAYS && quotes.size < HISTORY_TARGET_CLOSINGS; offset += HISTORY_BATCH_SIZE) {
     const dates = Array.from({ length: Math.min(HISTORY_BATCH_SIZE, HISTORY_CALENDAR_DAYS - offset) }, (_, index) => shiftDate(latestCompact, -(offset + index)))
+      .filter((date) => !isWeekend(date))
     const files = await Promise.allSettled(dates.map((date) => loadCsv(date)))
     files.forEach((result, index) => {
       if (result.status === 'rejected') return
@@ -290,7 +289,7 @@ export default {
       const cached = await cachedRatesResponse(request, workerCache)
       if (cached) return cached
       try {
-        const rates = await getRates(new Date(), fetch, createEdgeCsvCache(url.origin, workerCache))
+        const rates = await getRates(new Date(), fetch, createMemoryCsvCache())
         const response = json(rates)
         await cacheRatesResponse(request, response, workerCache)
         return response

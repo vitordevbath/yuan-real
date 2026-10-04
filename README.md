@@ -26,9 +26,9 @@ React · TypeScript · Cloudflare Workers · PWA
 
 ## Como funciona
 
-O Worker atende `GET /api/rates`: parte da data atual em `America/Sao_Paulo`, recua até 10 dias até achar um CSV com a linha CNY/795/A, e monta o histórico com os CSVs dos ~45 dias anteriores. O CSV é lido em Windows-1252 e os decimais com vírgula são validados.
+O Worker atende `GET /api/rates`: parte da data atual em `America/Sao_Paulo`, recua até 10 dias até achar um CSV com a linha CNY/795/A, e monta o histórico com os CSVs dos dias úteis dos ~45 dias anteriores. O CSV é lido em Windows-1252 e os decimais com vírgula são validados.
 
-Cache (Cache API do Cloudflare): resposta de `/api/rates` por 3 minutos, CSV do dia por 3 minutos e CSVs de datas passadas por 30 dias, já que não mudam. A conversão é feita no navegador, sem novas requisições enquanto se digita. O navegador nunca acessa o BCB diretamente.
+Cache: a resposta de `/api/rates` fica 3 minutos na Cache API do Cloudflare; os CSVs ficam em memória do Worker (o do dia por 3 minutos, os de datas passadas por 30 dias, já que não mudam). Isso mantém cada resposta abaixo do limite de 50 subrequests do plano gratuito. A conversão é feita no navegador, sem novas requisições enquanto se digita. O navegador nunca acessa o BCB diretamente.
 
 ## Instalação e desenvolvimento
 
